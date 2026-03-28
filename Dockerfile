@@ -18,7 +18,7 @@ pipeline {
             steps {
                 withCredentials([usernamePassword(credentialsId: 'docker-hub-credentials', usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]) {
                     sh '/usr/local/bin/docker login -u $USERNAME -p $PASSWORD'
-                    sh '/usr/local/bin/docker push Jashwanthram9848/html-demo:latest'
+                    sh '/usr/local/bin/docker push jashwanthram9848/html-demo:latest'
                 }
             }
         }
