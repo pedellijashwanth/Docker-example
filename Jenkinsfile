@@ -2,82 +2,50 @@ pipeline {
     agent any
 
     environment {
-        PATH = "/usr/local/bin:/opt/homebrew/bin:${env.PATH}"
-        IMAGE_NAME = "jashwanthram9848/html-demo"
-        IMAGE_TAG = "${env.BUILD_NUMBER}"
-    }
-
-    options {
-        timestamps()
-        disableConcurrentBuilds()
+        DOCKER_IMAGE = "swetab84/html-demo"
     }
 
     stages {
 
         stage('Clone Code') {
             steps {
-                git branch: 'main', url: 'https://github.com/pedellijashwnath/Docker-example.git'
+                git branch: 'main',
+                    url: 'https://github.com/swetab-max/docker-example.git'
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                sh """
-                docker pull ${IMAGE_NAME}:latest || true
-
-                docker build \
-                  --cache-from=${IMAGE_NAME}:latest \
-                  -t ${IMAGE_NAME}:${IMAGE_TAG} \
-                  -t ${IMAGE_NAME}:latest .
-                """
+                bat 'docker build -t %DOCKER_IMAGE% .'
             }
         }
 
         stage('Push Image') {
-            when {
-                branch 'main'
-            }
             steps {
                 withCredentials([usernamePassword(
-                    credentialsId: 'docker-hub-credentials',
-                    usernameVariable: 'USERNAME',
-                    passwordVariable: 'PASSWORD'
+                    credentialsId: 'dockerhub',
+                    usernameVariable: 'USER',
+                    passwordVariable: 'PASS'
                 )]) {
-                    sh """
-                    echo "$PASSWORD" | docker login -u "$USERNAME" --password-stdin
-
-                    docker push ${IMAGE_NAME}:${IMAGE_TAG}
-                    docker push ${IMAGE_NAME}:latest
-
-                    docker logout
-                    """
+                    bat 'docker login -u %USER% -p %PASS%'
+                    bat 'docker push %DOCKER_IMAGE%'
                 }
             }
         }
 
         stage('Deploy to Kubernetes') {
-            when {
-                branch 'main'
-            }
             steps {
-                sh """
-                kubectl set image deployment/html-demo \
-                html-demo=${IMAGE_NAME}:${IMAGE_TAG} || \
-                kubectl apply -f deployment.yaml
-                """
+                withCredentials([file(
+                    credentialsId: 'kuberconfig',
+                    variable: 'KUBECONFIG'
+                )]) {
+                    bat '''
+                        set KUBECONFIG=%KUBECONFIG%
+                        kubectl apply -f deployment.yaml --validate=false
+                    '''
+                }
             }
         }
-    }
 
-    post {
-        always {
-            sh "docker system prune -f || true"
-        }
-        success {
-            echo "Build ${IMAGE_TAG} deployed successfully"
-        }
-        failure {
-            echo "Pipeline failed"
-        }
     }
 }
